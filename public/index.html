@@ -208,7 +208,7 @@
   scene.background = new THREE.Color('#080706');
 
   var camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 10000);
-  camera.position.set(0, 1.2, 4);
+  camera.position.set(0, 20, 80);
 
   var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
   renderer.setPixelRatio(window.devicePixelRatio);
@@ -238,6 +238,129 @@
   scene.add(tiltGroup);
   tiltGroup.add(planet);
 
+  // ═══ PLUTO-CHARON BINARY ═══
+  // Pluto and Charon are mutually tidally locked, orbiting a common
+  // barycenter that lies OUTSIDE Pluto. Charon is ~11.6% of Pluto's
+  // mass (ratio 0.116), so the barycenter is at:
+  //   r_bary = Charon_a * M_charon / (M_pluto + M_charon)
+  //          = 19591 km * 0.1039 = 2036 km above Pluto's center
+  // Pluto's radius is 1188 km, so the barycenter is OUTSIDE Pluto
+  // (~1036 km above the surface). This is what makes Pluto-Charon a
+  // "double planet" rather than a simple planet-moon system.
+  //
+  // Scene scale: Pluto radius 1.5 = 1188 km real, so 1 unit = 792 km.
+  var SCENE_UNIT_KM_PLUTO = 1188 / 1.5;
+  var CHARON = {
+    a_km: 19591,  // Pluto-Charon separation
+    e: 0.0022,
+    period_days: 6.387,  // same as Pluto's rotation (tidal lock)
+    color: 0x9e8a7a,
+    radius: 0.76,  // Charon radius = 606 km ≈ 51% of Pluto's
+  };
+  CHARON.a = CHARON.a_km / SCENE_UNIT_KM_PLUTO;  // ~24.7 scene units
+  CHARON.period = CHARON.period_days * 86400;
+
+  // Mass ratio for barycenter offset
+  var MASS_RATIO = 0.1039 / (1 + 0.1039);  // Charon mass fraction of the pair
+  var BARY_PLUTO_OFFSET = CHARON.a * MASS_RATIO;  // Pluto offset from barycenter
+  var BARY_CHARON_OFFSET = CHARON.a * (1 - MASS_RATIO);
+
+  // Reparent Pluto from tiltGroup to a "barycenter wobble" wrapper so the
+  // binary system orbits the shared center of mass.
+  tiltGroup.remove(planet);
+  var plutoCharonGroup = new THREE.Group();
+  tiltGroup.add(plutoCharonGroup);
+  plutoCharonGroup.add(planet);
+
+  var charonMesh = new THREE.Mesh(
+    new THREE.SphereGeometry(CHARON.radius, 32, 20),
+    new THREE.MeshStandardMaterial({ color: CHARON.color, roughness: 0.8 })
+  );
+  plutoCharonGroup.add(charonMesh);
+
+  // Orbit polyline around the barycenter (the barycenter is at origin of
+  // plutoCharonGroup; Pluto sits at -offset_pluto, Charon at +offset_charon)
+  (function drawOrbit() {
+    var pts = [];
+    for (var k = 0; k <= 128; k++) {
+      var th = (k / 128) * Math.PI * 2;
+      pts.push(new THREE.Vector3(BARY_CHARON_OFFSET * Math.cos(th), 0, BARY_CHARON_OFFSET * Math.sin(th)));
+    }
+    var line = new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints(pts),
+      new THREE.LineBasicMaterial({ color: CHARON.color, transparent: true, opacity: 0.35 })
+    );
+    plutoCharonGroup.add(line);
+  })();
+
+  function solveKepler(M, e) {
+    var E = M;
+    for (var i = 0; i < 12; i++) {
+      var f = E - e * Math.sin(E) - M;
+      var fp = 1 - e * Math.cos(E);
+      E -= f / fp;
+    }
+    return E;
+  }
+
+  // ═══ SPUTNIK PLANITIA MARKER ═══
+  // The heart-shaped nitrogen ice plain, centered at ~20N, 180W
+  // (Tombaugh Regio Western lobe). Attached as a child of planet so it
+  // rotates with Pluto's spin (tidally locked, always facing Charon).
+  (function sputnik() {
+    var geo = new THREE.SphereGeometry(0.06, 16, 12);
+    var mat = new THREE.MeshBasicMaterial({ color: 0xfff0e0 });
+    var mesh = new THREE.Mesh(geo, mat);
+    var lat = 20 * Math.PI / 180;
+    var lon = 180 * Math.PI / 180;
+    var r = 1.52;
+    mesh.position.set(
+      r * Math.cos(lat) * Math.cos(lon),
+      r * Math.sin(lat),
+      r * Math.cos(lat) * Math.sin(lon),
+    );
+    planet.add(mesh);
+  })();
+
+  // ═══ NEW HORIZONS TRAJECTORY MARKER ═══
+  // New Horizons flew past Pluto on 2015-07-14 at 12,500 km altitude.
+  // It's now heading outbound through the Kuiper Belt (Arrokoth flyby 2019).
+  // Represent as a small blue dot on a straight departing trajectory
+  // beyond Charon's orbit.
+  (function nh() {
+    var geo = new THREE.SphereGeometry(0.08, 16, 12);
+    var mat = new THREE.MeshBasicMaterial({ color: 0x7db3ff });
+    var mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(50, 8, 30);
+    tiltGroup.add(mesh);
+    // Draw a line from Pluto to the current NH position as a trajectory hint
+    var pts = [new THREE.Vector3(0, 0, 0), new THREE.Vector3(50, 8, 30)];
+    var line = new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints(pts),
+      new THREE.LineBasicMaterial({ color: 0x7db3ff, transparent: true, opacity: 0.4 })
+    );
+    tiltGroup.add(line);
+  })();
+
+  var SCENE_EPOCH_SEC = Date.now() / 1000;
+  function updateMoons() {
+    var TIME_SCALE = 3000;  // Charon orbits every ~3 minutes real
+    var simTime = (Date.now() / 1000 - SCENE_EPOCH_SEC) * TIME_SCALE;
+    var n = (Math.PI * 2) / CHARON.period;
+    var M = (n * simTime) % (Math.PI * 2);
+    var E = solveKepler(M, CHARON.e);
+    var nu = 2 * Math.atan2(Math.sqrt(1 + CHARON.e) * Math.sin(E/2), Math.sqrt(1 - CHARON.e) * Math.cos(E/2));
+    var r = CHARON.a * (1 - CHARON.e * Math.cos(E));
+    var cx = r * Math.cos(nu);
+    var cz = r * Math.sin(nu);
+
+    // Pluto and Charon are on opposite sides of the barycenter
+    var plutoFraction = BARY_PLUTO_OFFSET / CHARON.a;
+    var charonFraction = BARY_CHARON_OFFSET / CHARON.a;
+    planet.position.set(-cx * plutoFraction, 0, -cz * plutoFraction);
+    charonMesh.position.set(cx * charonFraction, 0, cz * charonFraction);
+  }
+
   // Subtle starfield
   (function stars() {
     var geo = new THREE.BufferGeometry();
@@ -261,7 +384,7 @@
   controls.enableDamping = true;
   controls.dampingFactor = 0.08;
   controls.minDistance = 2.2;
-  controls.maxDistance = 40;
+  controls.maxDistance = 300;
 
   // Resize
   window.addEventListener('resize', function () {
@@ -274,6 +397,7 @@
   function tick() {
     requestAnimationFrame(tick);
     planet.rotation.y += -0.000162;
+    updateMoons();
     controls.update();
     renderer.render(scene, camera);
   }
