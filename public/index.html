@@ -160,17 +160,17 @@
 <div class="content">
   <div class="sidebar-left">
     <h3>Body Facts</h3>
-    <div class="info-row"><span>Name</span><span>Pluto</span></div>
-    <div class="info-row"><span>Radius</span><span>1,188 km</span></div>
-    <div class="info-row"><span>Platform</span><span>v0.1</span></div>
+    <div class="info-row"><span>Radius</span><span>1,188.3 km</span></div>
+    <div class="info-row"><span>Mass</span><span>1.303 × 10²² kg</span></div>
+    <div class="info-row"><span>Moons</span><span>5 (Charon, Styx, Nix, Kerberos, Hydra)</span></div>
+    <div class="info-row"><span>Axial tilt</span><span>119.51&deg;</span></div>
+    <div class="info-row"><span>Orbital period</span><span>247.94 yr</span></div>
+    <div class="info-row"><span>Sidereal day</span><span>6.39 d (tidally locked to Charon)</span></div>
+    <div class="info-row"><span>Dist. from Sun</span><span>5.91 B km (39.48 AU avg)</span></div>
 
-    <h3>Layer Catalog</h3>
+    <h3>Roadmap v0.2</h3>
     <div class="coming-soon">
-      Live data layers for Pluto are in active development. Watch
-      <a href="https://terraresource.net" style="color:var(--accent);text-decoration:none">TerraResource</a>,
-      <a href="https://moonresource.com" style="color:var(--accent);text-decoration:none">MoonResource</a>,
-      and <a href="https://marsresource.net" style="color:var(--accent);text-decoration:none">MarsResource</a>
-      for the capability pattern.
+      New Horizons LORRI imagery; Sputnik Planitia nitrogen ice; Charon dual-planet mechanics; Kuiper Belt context; atmospheric escape.
     </div>
 
     <h3>Resource Systems</h3>
@@ -240,6 +240,7 @@
   });
   var planet = new THREE.Mesh(geometry, material);
   scene.add(planet);
+  planet.rotation.z = 2.085843; // 119.51 deg axial tilt
 
   // Subtle starfield
   (function stars() {
@@ -276,7 +277,7 @@
   // Animate
   function tick() {
     requestAnimationFrame(tick);
-    planet.rotation.y += 0.0015;
+    planet.rotation.y += -0.000162;
     controls.update();
     renderer.render(scene, camera);
   }
