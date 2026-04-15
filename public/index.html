@@ -303,6 +303,43 @@
     plutoCharonGroup.add(charonOrbitLine);
   })();
 
+  // ═══ PLUTO SMALL OUTER MOONS ═══
+  // The four small moons orbit the same Pluto-Charon barycenter on nearly
+  // circular, nearly coplanar orbits. Real semi-major axes and periods from
+  // New Horizons mission data. Markers scaled up so theyre visible at the
+  // default zoom. Grouped for sidebar toggle.
+  var SMALL_MOONS = [
+    { name: 'Styx',     a_km: 42656, e: 0.00001, period_days: 20.16162, color: 0x9a8878, radius: 0.04 },
+    { name: 'Nix',      a_km: 48694, e: 0.00000, period_days: 24.85463, color: 0xb0a494, radius: 0.05 },
+    { name: 'Kerberos', a_km: 57783, e: 0.00328, period_days: 32.16756, color: 0x8e8272, radius: 0.04 },
+    { name: 'Hydra',    a_km: 64738, e: 0.00586, period_days: 38.20177, color: 0xbcb0a0, radius: 0.05 },
+  ];
+  var smallMoonsGroup = new THREE.Group();
+  var smallMoonOrbitsGroup = new THREE.Group();
+  plutoCharonGroup.add(smallMoonsGroup);
+  plutoCharonGroup.add(smallMoonOrbitsGroup);
+  var smallMoonMeshes = [];
+  SMALL_MOONS.forEach(function(m) {
+    m.a = m.a_km / SCENE_UNIT_KM_PLUTO;
+    m.period = m.period_days * 86400;
+    var mesh = new THREE.Mesh(
+      new THREE.SphereGeometry(m.radius, 16, 12),
+      new THREE.MeshStandardMaterial({ color: m.color, roughness: 0.85 })
+    );
+    smallMoonsGroup.add(mesh);
+    m.mesh = mesh;
+    smallMoonMeshes.push(m);
+    var pts = [];
+    for (var k = 0; k <= 128; k++) {
+      var th = (k / 128) * Math.PI * 2;
+      pts.push(new THREE.Vector3(m.a * Math.cos(th), 0, m.a * Math.sin(th)));
+    }
+    smallMoonOrbitsGroup.add(new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints(pts),
+      new THREE.LineBasicMaterial({ color: m.color, transparent: true, opacity: 0.25 })
+    ));
+  });
+
   function solveKepler(M, e) {
     var E = M;
     for (var i = 0; i < 12; i++) {
@@ -335,16 +372,75 @@
 
   // ═══ NEW HORIZONS TRAJECTORY MARKER ═══
   // New Horizons flew past Pluto on 2015-07-14. It continues outbound
-  // through the Kuiper Belt (Arrokoth flyby 2019). Rendered as a small
-  // blue dot plus a departing trajectory line. Whole thing is toggleable.
+  // through the Kuiper Belt (Arrokoth flyby 2019). Rendered as a 3D
+  // primitive stack: the distinctive 2.1 m high-gain antenna dish on top,
+  // a compact triangular bus below, and an RTG power boom extending
+  // sideways. Whole thing is toggleable via the sidebar.
   var nhGroup = new THREE.Group();
   tiltGroup.add(nhGroup);
   (function nh() {
-    var geo = new THREE.SphereGeometry(0.08, 16, 12);
-    var mat = new THREE.MeshBasicMaterial({ color: 0x7db3ff });
-    var mesh = new THREE.Mesh(geo, mat);
-    mesh.position.set(50, 8, 30);
-    nhGroup.add(mesh);
+    var craft = new THREE.Group();
+
+    // High-gain antenna dish (NH's most prominent feature)
+    var dish = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.14, 0.14, 0.01, 24),
+      new THREE.MeshStandardMaterial({ color: 0xeae4d8, roughness: 0.3, metalness: 0.3 })
+    );
+    dish.position.y = 0.05;
+    craft.add(dish);
+    // Dish rim for a recognizable silhouette
+    var rim = new THREE.Mesh(
+      new THREE.TorusGeometry(0.14, 0.01, 10, 32),
+      new THREE.MeshStandardMaterial({ color: 0xc0bba8, roughness: 0.4, metalness: 0.4 })
+    );
+    rim.position.y = 0.05;
+    rim.rotation.x = Math.PI / 2;
+    craft.add(rim);
+
+    // Triangular bus (approximated with a thin BoxGeometry)
+    var bus = new THREE.Mesh(
+      new THREE.BoxGeometry(0.10, 0.06, 0.10),
+      new THREE.MeshStandardMaterial({ color: 0xd4c89a, roughness: 0.45, metalness: 0.55 })
+    );
+    bus.position.y = -0.02;
+    craft.add(bus);
+
+    // RTG (radioisotope thermoelectric generator) boom extending sideways
+    var rtgBoom = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.01, 0.01, 0.18, 8),
+      new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.5, metalness: 0.5 })
+    );
+    rtgBoom.position.set(-0.14, -0.02, 0);
+    rtgBoom.rotation.z = Math.PI / 2;
+    craft.add(rtgBoom);
+    var rtg = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.025, 0.025, 0.08, 16),
+      new THREE.MeshStandardMaterial({ color: 0x444444, roughness: 0.6, metalness: 0.4 })
+    );
+    rtg.position.set(-0.24, -0.02, 0);
+    rtg.rotation.z = Math.PI / 2;
+    craft.add(rtg);
+
+    craft.position.set(50, 8, 30);
+    nhGroup.add(craft);
+
+    // Label
+    var lc = document.createElement('canvas');
+    lc.width = 256; lc.height = 48;
+    var lctx = lc.getContext('2d');
+    lctx.font = 'bold 22px -apple-system, sans-serif';
+    lctx.textAlign = 'center'; lctx.textBaseline = 'middle';
+    lctx.strokeStyle = '#000'; lctx.lineWidth = 4;
+    lctx.strokeText('New Horizons', 128, 24);
+    lctx.fillStyle = '#7db3ff';
+    lctx.fillText('New Horizons', 128, 24);
+    var tex = new THREE.CanvasTexture(lc);
+    var sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, depthTest: false }));
+    sp.scale.set(1.2, 0.22, 1);
+    sp.position.set(0, 0.25, 0);
+    craft.add(sp);
+
+    // Trajectory line back to Pluto
     var pts = [new THREE.Vector3(0, 0, 0), new THREE.Vector3(50, 8, 30)];
     nhGroup.add(new THREE.Line(
       new THREE.BufferGeometry().setFromPoints(pts),
@@ -356,19 +452,30 @@
   function updateMoons() {
     var TIME_SCALE = 60;  // Charon orbits every ~3 minutes real
     var simTime = (Date.now() / 1000 - SCENE_EPOCH_SEC) * TIME_SCALE;
-    var n = (Math.PI * 2) / CHARON.period;
-    var M = (n * simTime) % (Math.PI * 2);
-    var E = solveKepler(M, CHARON.e);
-    var nu = 2 * Math.atan2(Math.sqrt(1 + CHARON.e) * Math.sin(E/2), Math.sqrt(1 - CHARON.e) * Math.cos(E/2));
-    var r = CHARON.a * (1 - CHARON.e * Math.cos(E));
-    var cx = r * Math.cos(nu);
-    var cz = r * Math.sin(nu);
+    var nC = (Math.PI * 2) / CHARON.period;
+    var MC = (nC * simTime) % (Math.PI * 2);
+    var EC = solveKepler(MC, CHARON.e);
+    var nuC = 2 * Math.atan2(Math.sqrt(1 + CHARON.e) * Math.sin(EC/2), Math.sqrt(1 - CHARON.e) * Math.cos(EC/2));
+    var rC = CHARON.a * (1 - CHARON.e * Math.cos(EC));
+    var cx = rC * Math.cos(nuC);
+    var cz = rC * Math.sin(nuC);
 
     // Pluto and Charon are on opposite sides of the barycenter
     var plutoFraction = BARY_PLUTO_OFFSET / CHARON.a;
     var charonFraction = BARY_CHARON_OFFSET / CHARON.a;
     planet.position.set(-cx * plutoFraction, 0, -cz * plutoFraction);
     charonMesh.position.set(cx * charonFraction, 0, cz * charonFraction);
+
+    // Small outer moons follow independent Kepler orbits around the
+    // barycenter (already the origin of plutoCharonGroup).
+    smallMoonMeshes.forEach(function(m) {
+      var n = (Math.PI * 2) / m.period;
+      var M = (n * simTime) % (Math.PI * 2);
+      var E = solveKepler(M, m.e);
+      var nu = 2 * Math.atan2(Math.sqrt(1 + m.e) * Math.sin(E/2), Math.sqrt(1 - m.e) * Math.cos(E/2));
+      var r = m.a * (1 - m.e * Math.cos(E));
+      m.mesh.position.set(r * Math.cos(nu), 0, r * Math.sin(nu));
+    });
   }
 
 
@@ -498,13 +605,15 @@
 
   // ═══ INTERACTIVE LAYER LIST ═══
   var LAYERS = [
-    { id: 'surface', name: 'Pluto surface',  desc: '2K New Horizons LORRI imagery', visible: true },
-    { id: 'charon',  name: 'Charon',         desc: 'Binary partner, 6.387-day orbit', visible: true },
-    { id: 'orbit',   name: 'Charon orbit',   desc: 'Around the shared barycenter', visible: true },
-    { id: 'sputnik', name: 'Sputnik Planitia', desc: 'Nitrogen ice heart, 20N 180W', visible: true },
-    { id: 'nh',      name: 'New Horizons',   desc: '2015 flyby, outbound Kuiper Belt', visible: true },
-    { id: 'context', name: 'Solar System context', desc: 'Directions to each major body', visible: true },
-    { id: 'stars',   name: 'Starfield',      desc: 'Procedural background stars', visible: true },
+    { id: 'surface',    name: 'Pluto surface',    desc: '2K New Horizons LORRI imagery', visible: true },
+    { id: 'charon',     name: 'Charon',           desc: 'Binary partner, 6.387-day orbit', visible: true },
+    { id: 'orbit',      name: 'Charon orbit',     desc: 'Around the shared barycenter', visible: true },
+    { id: 'smallmoons', name: 'Small moons',      desc: 'Styx, Nix, Kerberos, Hydra', visible: true },
+    { id: 'smallorbits',name: 'Small moon orbits', desc: 'Outer circular paths', visible: true },
+    { id: 'sputnik',    name: 'Sputnik Planitia', desc: 'Nitrogen ice heart, 20N 180W', visible: true },
+    { id: 'nh',         name: 'New Horizons',     desc: '2015 flyby, outbound Kuiper Belt', visible: true },
+    { id: 'context',    name: 'Solar System context', desc: 'Directions to each major body', visible: true },
+    { id: 'stars',      name: 'Starfield',        desc: 'Procedural background stars', visible: true },
   ];
 
   function setLayerVisible(id, on) {
@@ -512,13 +621,15 @@
     if (!l) return;
     l.visible = on;
     switch (id) {
-      case 'surface': planet.visible = on; break;
-      case 'charon':  charonMesh.visible = on; break;
-      case 'orbit':   if (charonOrbitLine) charonOrbitLine.visible = on; break;
-      case 'sputnik': sputnikGroup.visible = on; break;
-      case 'nh':      nhGroup.visible = on; break;
-      case 'context': if (solarSystemGroup) solarSystemGroup.visible = on; break;
-      case 'stars':   if (starfield) starfield.visible = on; break;
+      case 'surface':     planet.visible = on; break;
+      case 'charon':      charonMesh.visible = on; break;
+      case 'orbit':       if (charonOrbitLine) charonOrbitLine.visible = on; break;
+      case 'smallmoons':  smallMoonsGroup.visible = on; break;
+      case 'smallorbits': smallMoonOrbitsGroup.visible = on; break;
+      case 'sputnik':     sputnikGroup.visible = on; break;
+      case 'nh':          nhGroup.visible = on; break;
+      case 'context':     if (solarSystemGroup) solarSystemGroup.visible = on; break;
+      case 'stars':       if (starfield) starfield.visible = on; break;
     }
     renderLayerList();
   }
