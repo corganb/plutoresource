@@ -387,7 +387,7 @@
   var sputnikGroup = new THREE.Group();
   planet.add(sputnikGroup);
   (function sputnik() {
-    var geo = new THREE.SphereGeometry(0.06, 16, 12);
+    var geo = new THREE.SphereGeometry(0.02, 12, 8);
     var mat = new THREE.MeshBasicMaterial({ color: 0xfff0e0 });
     var mesh = new THREE.Mesh(geo, mat);
     var lat = 20 * Math.PI / 180;
