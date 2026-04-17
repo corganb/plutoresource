@@ -217,7 +217,7 @@
 <!-- Three.js (via jsdelivr UMD) -->
 <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
-<script src="resource-systems-core.js?v=14"></script>
+<script src="resource-systems-core.js?v=15"></script>
 
 <script>
 // ═══════════════════════════════════════════════════════════════════════════
@@ -260,6 +260,14 @@
   tiltGroup.rotation.z = 2.085843; // 119.51 deg axial tilt
   scene.add(tiltGroup);
   tiltGroup.add(planet);
+
+  planet.userData = { _analysis: {
+    name: 'Pluto', type: 'Dwarf planet',
+    image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/ef/Pluto_in_True_Color_-_High-Res.jpg/220px-Pluto_in_True_Color_-_High-Res.jpg',
+    desc: 'Reclassified as dwarf planet in 2006. Part of a binary system with Charon (barycenter outside Pluto). Heart-shaped nitrogen ice plain (Sputnik Planitia) discovered by New Horizons in 2015.',
+    fields: [{label:'Radius',value:'1,188 km'},{label:'Mass',value:'1.303 x 10\u00B2\u00B2 kg'},{label:'Moons',value:'5 (Charon, Styx, Nix, Kerberos, Hydra)'},{label:'Orbital period',value:'247.9 years'},{label:'Dist. from Sun',value:'39.5 AU (avg)'},{label:'Surface temp',value:'-229 C'}],
+  }};
+
 
   // ═══ PLUTO-CHARON BINARY ═══
   // Pluto and Charon are mutually tidally locked, orbiting a common
@@ -701,6 +709,41 @@
     });
   })();
 
+
+
+  // ═══ ANALYSIS PANEL CLICK HANDLER ═══
+  (function wireAnalysis() {
+    var rc = new THREE.Raycaster();
+    var mouse = new THREE.Vector2();
+    canvas.addEventListener('click', function(ev) {
+      if (!window.RS || !RS.showAnalysisPanel) return;
+      var rect = canvas.getBoundingClientRect();
+      mouse.x = ((ev.clientX - rect.left) / rect.width) * 2 - 1;
+      mouse.y = -((ev.clientY - rect.top) / rect.height) * 2 + 1;
+      rc.setFromCamera(mouse, camera);
+      var targets = [];
+      // Collect all meshes in tiltGroup (moons, spacecraft, markers)
+      tiltGroup.traverse(function(obj) {
+        if (obj.isMesh && obj.userData && obj.userData._analysis) targets.push(obj);
+      });
+      // Also check planet itself
+      if (planet && planet.userData && planet.userData._analysis) targets.push(planet);
+      // Check scene-level groups
+      scene.traverse(function(obj) {
+        if (obj.isMesh && obj.userData && obj.userData._analysis && targets.indexOf(obj) === -1) targets.push(obj);
+      });
+      var hits = rc.intersectObjects(targets, true);
+      if (!hits.length) return;
+      var obj = hits[0].object;
+      for (var i = 0; i < 5; i++) {
+        if (obj.userData && obj.userData._analysis) break;
+        if (obj.parent) obj = obj.parent; else break;
+      }
+      if (obj.userData && obj.userData._analysis) {
+        RS.showAnalysisPanel(obj.userData._analysis);
+      }
+    });
+  })();
 
   // ═══ RESET VIEW BUTTON ═══
   // Captures the initial camera position/target and resets to it on click.
