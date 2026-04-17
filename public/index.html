@@ -308,6 +308,13 @@
     new THREE.MeshStandardMaterial({ color: CHARON.color, roughness: 0.8 })
   );
   plutoCharonGroup.add(charonMesh);
+  charonMesh.userData = { _analysis: {
+    name: 'Charon', type: 'Binary partner moon',
+    image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/2e/Charon_in_True_Color_-_High-Res.jpg/220px-Charon_in_True_Color_-_High-Res.jpg',
+    desc: 'Largest moon relative to its planet (radius 51% of Pluto). The Pluto-Charon system orbits a shared barycenter outside Pluto\'s surface, making it a true binary. Reddish north polar cap (Mordor Macula) from tholin deposits.',
+    fields: [{label:'Radius',value:'606 km'},{label:'Orbit',value:'19,591 km'},{label:'Period',value:'6.387 days (tidally locked)'},{label:'Mass ratio',value:'~12% of Pluto'},{label:'Discovery',value:'1978'}],
+  }};
+
 
   // Orbit polyline around the barycenter, kept as a named reference so the
   // sidebar can toggle the Charon orbit ring independently of Charon itself.
