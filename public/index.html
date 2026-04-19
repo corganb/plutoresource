@@ -357,6 +357,15 @@
     smallMoonsGroup.add(mesh);
     m.mesh = mesh;
     smallMoonMeshes.push(m);
+    var SMALL_MOON_ANALYSIS = {
+      Styx:     { type: 'Small outer moon', desc: 'Smallest known moon of Pluto, discovered 2012 by Hubble. Irregular shape, likely rubble pile. Named after the river Styx in Greek mythology.', fields: [{label:'Dimensions',value:'~16 x 9 x 8 km'},{label:'Orbit',value:'42,656 km'},{label:'Period',value:'20.16 days'},{label:'Discovered',value:'2012 (Hubble)'}] },
+      Nix:      { type: 'Small outer moon', desc: 'Third moon discovered (2005). Elongated shape. Chaotic rotation due to gravitational influence of Pluto-Charon binary.', fields: [{label:'Dimensions',value:'~50 x 35 x 33 km'},{label:'Orbit',value:'48,694 km'},{label:'Period',value:'24.85 days'},{label:'Discovered',value:'2005 (Hubble)'}] },
+      Kerberos:  { type: 'Small outer moon', desc: 'Fourth moon discovered (2011). Double-lobed shape suggesting two smaller bodies merged. Very dark surface.', fields: [{label:'Dimensions',value:'~19 x 10 x 9 km'},{label:'Orbit',value:'57,783 km'},{label:'Period',value:'32.17 days'},{label:'Discovered',value:'2011 (Hubble)'}] },
+      Hydra:    { type: 'Small outer moon', desc: 'Second moon discovered (2005). Largest of the small moons. Elongated, highly reflective icy surface. Chaotic tumbling rotation.', fields: [{label:'Dimensions',value:'~65 x 45 x 25 km'},{label:'Orbit',value:'64,738 km'},{label:'Period',value:'38.20 days'},{label:'Discovered',value:'2005 (Hubble)'}] },
+    };
+    var smd = SMALL_MOON_ANALYSIS[m.name];
+    if (smd) mesh.userData = { _analysis: { name: m.name, type: smd.type, desc: smd.desc, fields: smd.fields, icon: '\uD83C\uDF11' } };
+
     var pts = [];
     for (var k = 0; k <= 128; k++) {
       var th = (k / 128) * Math.PI * 2;
@@ -397,6 +406,14 @@
     );
     sputnikGroup.add(mesh);
   })();
+
+  sputnikGroup.children[0].userData = { _analysis: {
+    name: 'Sputnik Planitia', type: 'Nitrogen ice plain',
+    desc: 'The western lobe of Pluto\'s heart-shaped Tombaugh Regio. A 1,000 km wide basin filled with nitrogen, carbon monoxide, and methane ices. Convection cells visible on the surface indicate active geological processes. No impact craters found, suggesting a surface age under 10 million years.',
+    fields: [{label:'Width',value:'~1,000 km'},{label:'Location',value:'20 N, 180 W'},{label:'Ice composition',value:'N\u2082, CO, CH\u2084'},{label:'Surface age',value:'< 10 Myr'},{label:'Depth',value:'2-3 km below rim'}],
+    icon: '\u2764',
+  }};
+
 
   // ═══ NEW HORIZONS TRAJECTORY MARKER ═══
   // New Horizons flew past Pluto on 2015-07-14. It continues outbound
