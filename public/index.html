@@ -289,12 +289,15 @@
   //
   // Scene scale: Pluto radius 1.5 = 1188 km real, so 1 unit = 792 km.
   var SCENE_UNIT_KM_PLUTO = 1188 / 1.5;
+  var PLUTO_TILT_RAD = 2.085843; // 119.51 deg, matches tiltGroup.rotation.z
   var CHARON = {
+    slug: 'charon',
     a_km: 19591,  // Pluto-Charon separation
     e: 0.0022,
     period_days: 6.387,  // same as Pluto's rotation (tidal lock)
     color: 0x9e8a7a,
     radius: 0.76,  // Charon radius = 606 km ≈ 51% of Pluto's
+    phase: 0,
   };
   CHARON.a = CHARON.a_km / SCENE_UNIT_KM_PLUTO;  // ~24.7 scene units
   CHARON.period = CHARON.period_days * 86400;
@@ -345,10 +348,10 @@
   // New Horizons mission data. Markers scaled up so theyre visible at the
   // default zoom. Grouped for sidebar toggle.
   var SMALL_MOONS = [
-    { name: 'Styx',     a_km: 42656, e: 0.00001, period_days: 20.16162, color: 0x9a8878, radius: 0.04 },
-    { name: 'Nix',      a_km: 48694, e: 0.00000, period_days: 24.85463, color: 0xb0a494, radius: 0.05 },
-    { name: 'Kerberos', a_km: 57783, e: 0.00328, period_days: 32.16756, color: 0x8e8272, radius: 0.04 },
-    { name: 'Hydra',    a_km: 64738, e: 0.00586, period_days: 38.20177, color: 0xbcb0a0, radius: 0.05 },
+    { name: 'Styx',     slug: 'styx',     a_km: 42656, e: 0.00001, period_days: 20.16162, color: 0x9a8878, radius: 0.04 },
+    { name: 'Nix',      slug: 'nix',      a_km: 48694, e: 0.00000, period_days: 24.85463, color: 0xb0a494, radius: 0.05 },
+    { name: 'Kerberos', slug: 'kerberos', a_km: 57783, e: 0.00328, period_days: 32.16756, color: 0x8e8272, radius: 0.04 },
+    { name: 'Hydra',    slug: 'hydra',    a_km: 64738, e: 0.00586, period_days: 38.20177, color: 0xbcb0a0, radius: 0.05 },
   ];
   var smallMoonsGroup = new THREE.Group();
   var smallMoonOrbitsGroup = new THREE.Group();
@@ -383,7 +386,48 @@
       new THREE.BufferGeometry().setFromPoints(pts),
       new THREE.LineBasicMaterial({ color: m.color, transparent: true, opacity: 0.25 })
     ));
+    m.phase = 0;
   });
+
+  // ═══ REAL PLUTO SYSTEM POSITIONS (JPL Horizons via Supabase edge fn) ═══
+  // Anchors Charon and the four small outer moons to their true Pluto-centered
+  // positions at page load. Horizons returns ecliptic J2000 km; we inverse
+  // Pluto's 119.51 deg axial tilt to land in tiltGroup local (barycenter)
+  // frame, then compute phase offsets so the Kepler sim propagates correctly
+  // forward. Small moons are queried against Pluto body center as an
+  // approximation of the barycenter (offset ~2000 km vs 42,000-64,000 km
+  // orbits, well below visible scale).
+  (function fetchPlutoSystemPositions() {
+    var FN_BASE = 'https://pxocavaczfjcpvqeiznt.supabase.co/functions/v1/horizons-ephemeris';
+    var KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB4b2NhdmFjemZqY3B2cWVpem50Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1NDA3MDcsImV4cCI6MjA5MDExNjcwN30.48A2xW4YoGCESsVurxmW3MP9x_lq2AJ8XeS8nR2RVGI';
+    var ca = Math.cos(PLUTO_TILT_RAD), sa = Math.sin(PLUTO_TILT_RAD);
+    function anchor(body) {
+      fetch(FN_BASE + '?id=' + body.slug + '&center=' + encodeURIComponent('@pluto'), {
+        headers: { 'apikey': KEY, 'Authorization': 'Bearer ' + KEY }
+      })
+      .then(function(r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
+      .then(function(data) {
+        if (!data || !isFinite(data.x_km)) return;
+        var wx = data.x_km / SCENE_UNIT_KM_PLUTO;
+        var wy = data.z_km / SCENE_UNIT_KM_PLUTO;
+        var wz = -data.y_km / SCENE_UNIT_KM_PLUTO;
+        var lx = wx * ca + wy * sa;
+        var lz = wz;
+        var theta = Math.atan2(lz, lx);
+        var E = 2 * Math.atan(Math.sqrt((1 - body.e) / (1 + body.e)) * Math.tan(theta / 2));
+        var M = E - body.e * Math.sin(E);
+        var simAtAnchor = (window.__rs_sim_time || 0);
+        var n = (Math.PI * 2) / body.period;
+        body.phase = M - n * simAtAnchor;
+        body.real_xyz = { x: lx, y: 0, z: lz, epoch_cal: data.epoch_cal };
+      })
+      .catch(function(err) {
+        if (window.console) console.warn('[horizons] ' + body.slug + ': ' + err.message);
+      });
+    }
+    anchor(CHARON);
+    smallMoonMeshes.forEach(anchor);
+  })();
 
   function solveKepler(M, e) {
     var E = M;
@@ -511,7 +555,7 @@
     __rs_last_wall = __rs_now;
     var simTime = __rs_sim_time;
     var nC = (Math.PI * 2) / CHARON.period;
-    var MC = (nC * simTime) % (Math.PI * 2);
+    var MC = ((CHARON.phase || 0) + nC * simTime) % (Math.PI * 2);
     var EC = solveKepler(MC, CHARON.e);
     var nuC = 2 * Math.atan2(Math.sqrt(1 + CHARON.e) * Math.sin(EC/2), Math.sqrt(1 - CHARON.e) * Math.cos(EC/2));
     var rC = CHARON.a * (1 - CHARON.e * Math.cos(EC));
@@ -528,7 +572,7 @@
     // barycenter (already the origin of plutoCharonGroup).
     smallMoonMeshes.forEach(function(m) {
       var n = (Math.PI * 2) / m.period;
-      var M = (n * simTime) % (Math.PI * 2);
+      var M = ((m.phase || 0) + n * simTime) % (Math.PI * 2);
       var E = solveKepler(M, m.e);
       var nu = 2 * Math.atan2(Math.sqrt(1 + m.e) * Math.sin(E/2), Math.sqrt(1 - m.e) * Math.cos(E/2));
       var r = m.a * (1 - m.e * Math.cos(E));
