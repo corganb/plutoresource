@@ -358,7 +358,7 @@
   plutoCharonGroup.add(smallMoonsGroup);
   plutoCharonGroup.add(smallMoonOrbitsGroup);
   var smallMoonMeshes = [];
-  SMALL_MOONS.forEach(function(m) {
+  SMALL_MOONS.forEach(function(m, idx) {
     m.a = m.a_km / SCENE_UNIT_KM_PLUTO;
     m.period = m.period_days * 86400;
     var mesh = new THREE.Mesh(
@@ -386,7 +386,8 @@
       new THREE.BufferGeometry().setFromPoints(pts),
       new THREE.LineBasicMaterial({ color: m.color, transparent: true, opacity: 0.25 })
     ));
-    m.phase = 0;
+    m.phase = (idx / SMALL_MOONS.length) * Math.PI * 2;
+    mesh.position.set(m.a * Math.cos(m.phase), 0, m.a * Math.sin(m.phase));
   });
 
   // ═══ REAL PLUTO SYSTEM POSITIONS (JPL Horizons via Supabase edge fn) ═══
